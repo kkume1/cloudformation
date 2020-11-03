@@ -1,0 +1,431 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description:
+  nginx-sample
+
+Metadata:
+  "AWS::CloudFormation::Interface":
+    ParameterGroups:
+      - Label:
+          default: "Project Name prefix"
+        Parameters:
+          - ProjectName
+
+Parameters:
+  ProjectName:
+    Default: nginx-sample
+    Type: String
+
+Resources:
+#########
+#VPC
+  VPC:
+    Type: "AWS::EC2::VPC"
+    Properties:
+      CidrBlock: "10.0.0.0/16"
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-VPC"
+
+########
+# IGW
+  IGW:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-IGW"
+
+# IGW Attach
+  igwAttach:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref IGW
+      VpcId: !Ref VPC
+
+########
+# NatGW
+  NatGW0:  
+    Type: AWS::EC2::NatGateway
+    DependsOn: igwAttach
+    Properties:
+      AllocationId: !GetAtt EIP0.AllocationId
+      SubnetId: !Ref publicSubnet0
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-NatGW0"
+
+  EIP0:
+    Type: AWS::EC2::EIP
+    DependsOn: igwAttach
+    Properties:
+       Domain: vpc
+       Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-EIP0"
+
+  NatGW1:  
+    Type: AWS::EC2::NatGateway
+    DependsOn: igwAttach
+    Properties:
+      AllocationId: !GetAtt EIP1.AllocationId
+      SubnetId: !Ref publicSubnet1
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-NatGW1"
+
+  EIP1:
+    Type: AWS::EC2::EIP
+    DependsOn: igwAttach
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-EIP1"
+
+########
+# subnet   
+  publicSubnet0:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: 'ap-northeast-1a'
+      CidrBlock: '10.0.0.0/24'
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-publicSubnet0"
+  
+  publicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: 'ap-northeast-1c'
+      CidrBlock: '10.0.1.0/24'
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-publicSubnet1"
+
+  privateSubnet0:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: 'ap-northeast-1a'
+      CidrBlock: '10.0.10.0/24'
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-privateSubnet0"
+  
+  privateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: 'ap-northeast-1c'
+      CidrBlock: '10.0.11.0/24'
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-privateSubnet1"
+
+########
+# routeTable
+  pubricRT:
+    Type: AWS::EC2::RouteTable
+    DependsOn: igwAttach
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-pubricRT"
+
+  privateRT0:
+    Type: AWS::EC2::RouteTable
+    DependsOn: igwAttach
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-privateRT0"
+
+  privateRT1:
+    Type: AWS::EC2::RouteTable
+    DependsOn: igwAttach
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-privateRT1"
+
+# route
+  pubricRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref pubricRT    
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref IGW
+
+  privateRoute0:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref privateRT0  
+      DestinationCidrBlock: "0.0.0.0/0"
+      NatGatewayId: !Ref NatGW0
+
+  privateRoute1:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref privateRT1 
+      DestinationCidrBlock: "0.0.0.0/0"
+      NatGatewayId: !Ref NatGW1
+
+# routeTable Accosiation
+  pubricRT0publicSubnet0:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref pubricRT
+      SubnetId: !Ref publicSubnet0
+
+  pubricRT1publicSubnet1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref pubricRT
+      SubnetId: !Ref publicSubnet1
+
+  privateRT0publicSubnet0:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref privateRT0
+      SubnetId: !Ref privateSubnet0
+
+  privateRT1publicSubnet1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref privateRT1
+      SubnetId: !Ref privateSubnet1
+
+########
+# SecurityGroup
+  securityGroupPubric:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub "${ProjectName}-SG-Pubric"
+      GroupDescription: !Sub "${ProjectName} Security Group"
+      VpcId: !Ref VPC
+      SecurityGroupIngress: 
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-SG-Pubric"
+
+  securityGroupPrivate:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub "${ProjectName}-SG-Private"
+      GroupDescription: !Sub "${ProjectName} Security Group"
+      VpcId: !Ref VPC
+      SecurityGroupIngress: 
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !GetAtt [ securityGroupPubric, GroupId ] 
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-SG-Private"
+
+########
+# Log Group
+  LogGroupContainer:
+    Type: AWS::Logs::LogGroup
+    Properties: 
+      LogGroupName: !Sub "/${ProjectName}/Container-log"
+      RetentionInDays: 60
+
+# S3 Backe
+#
+# 本コンフィグは検証用のため、バケットは事前に作成している。
+#
+#  LogALB:
+#    Type: AWS::S3::Bucket
+#    Properties:
+#      BucketName: !Sub "/${ProjectName}/-ALB-Log"
+
+########
+# ALB
+  InternetALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub "${ProjectName}-ALB"
+      Type: application
+      Scheme: internet-facing
+      LoadBalancerAttributes:
+        - Key: access_logs.s3.enabled
+          Value: true
+        - Key: access_logs.s3.bucket 
+          Value: mecgogo-backet1
+        - Key: access_logs.s3.prefix
+          Value: nginx-CF
+        - Key: idle_timeout.timeout_seconds
+          Value: 60
+      SecurityGroups: 
+        - !Ref securityGroupPubric
+      Subnets:
+        - !Ref publicSubnet0
+        - !Ref publicSubnet1
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-ALB"
+  
+  InternetALBListner:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+      LoadBalancerArn: !Ref InternetALB
+      Port: 80
+      Protocol: HTTP
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${ProjectName}-TG"
+      VpcId: !Ref VPC     
+      TargetType: ip
+      Protocol: "HTTP"
+      Port: 80
+
+      # HealthCheckEnabled: true
+      # HealthCheckIntervalSeconds: 30
+      # HealthCheckPath: "/"
+      # HealthCheckPort: "80"
+      # HealthCheckProtocol: "HTTP"
+      # HealthCheckTimeoutSeconds: 10
+      # HealthyThresholdCount: 5
+      # UnhealthyThresholdCount: 2
+      # Matcher:
+      # HttpCode: "200"
+
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-TG"
+
+########
+# ECS Cluster
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub ${ProjectName}-Cluster
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-Cluster"
+
+# ECS TaskExecution ROLE
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-ECSTaskExecutionRolePolicy"
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      #  - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+
+# EC2 ContainerService Role
+# ExecutionRole:
+#   Type: AWS::IAM::Role
+#   Properties:
+#     RoleName: !Sub "${ProjectName}-EC2ContainerServiceforEC2Role"
+#     Path: /
+#     AssumeRolePolicyDocument:
+#       Version: 2012-10-17
+#       Statement:
+#         - Effect: Allow
+#           Principal:
+#             Service: ec2.amazonaws.com
+#           Action: sts:AssumeRole
+#     ManagedPolicyArns:
+#       - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role
+
+# ECS TaskDefine
+  ECSTaskDefine:
+    Type: AWS::ECS::TaskDefinition
+    DependsOn: LogGroupContainer
+    Properties:
+      Cpu: 256
+      Memory: 512
+      ExecutionRoleArn: !Ref ExecutionRole
+      Family: !Sub "${ProjectName}-Task"
+      NetworkMode: awsvpc
+      RequiresCompatibilities: 
+        - FARGATE
+
+      ContainerDefinitions:
+        - Name: !Sub ${ProjectName}
+          Image: !Sub "600814945494.dkr.ecr.ap-northeast-1.amazonaws.com/${ProjectName}"
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub "/${ProjectName}/Container-log"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: !Sub ${ProjectName}
+          # memoryReservation:  128
+          PortMappings:
+            - HostPort: 80
+              Protocol: tcp
+              ContainerPort: 80
+
+# ECS Service
+  ECSService:
+    Type: AWS::ECS::Service
+    DependsOn: 
+      - ECSTaskDefine
+      - ECSCluster
+      - ExecutionRole
+      - InternetALBListner
+    Properties:
+      ServiceName: !Sub "${ProjectName}-Service"
+      Cluster: !Ref ECSCluster
+      TaskDefinition: !Ref ECSTaskDefine
+      DesiredCount: 2
+      schedulingStrategy: REPLICA
+      LaunchType: FARGATE
+      HealthCheckGracePeriodSeconds: 60
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 50
+      LoadBalancers:
+        - ContainerName: !Sub ${ProjectName}
+          ContainerPort: 80
+          TargetGroupArn: !Ref TargetGroup
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups:
+            - !Ref securityGroupPrivate
+          Subnets:
+            - !Ref privateSubnet0
+            - !Ref privateSubnet1
+      PlatformVersion: 1.3.0
+
+######
+
+
+
+
+
+
+
+
+
+
+
+
+
