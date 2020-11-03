@@ -1,6 +1,6 @@
 # cloudformation による、AWS ECS環境の構築スクリプト
 <br>
-##概要
+## 概要
 このスクリプトは、AWS ECS(Fargate)をマルチAZで構築するcloudformationスクリプトです。
 ---
 構成図
