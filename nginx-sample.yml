@@ -370,7 +370,7 @@ Resources:
 
       ContainerDefinitions:
         - Name: !Sub ${ProjectName}
-          Image: !Sub "600814945494.dkr.ecr.ap-northeast-1.amazonaws.com/${ProjectName}"
+          Image: !Sub "<AWS_ACCOUNT_ID>.dkr.ecr.ap-northeast-1.amazonaws.com/${ProjectName}"
           LogConfiguration:
             LogDriver: awslogs
             Options:
