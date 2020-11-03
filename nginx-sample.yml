@@ -297,6 +297,7 @@ Resources:
       Protocol: "HTTP"
       Port: 80
 
+      # ヘルスチェック設定はデフォルトを使用のため、コメントアウト
       # HealthCheckEnabled: true
       # HealthCheckIntervalSeconds: 30
       # HealthCheckPath: "/"
@@ -338,22 +339,6 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
       #  - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
-
-# EC2 ContainerService Role
-# ExecutionRole:
-#   Type: AWS::IAM::Role
-#   Properties:
-#     RoleName: !Sub "${ProjectName}-EC2ContainerServiceforEC2Role"
-#     Path: /
-#     AssumeRolePolicyDocument:
-#       Version: 2012-10-17
-#       Statement:
-#         - Effect: Allow
-#           Principal:
-#             Service: ec2.amazonaws.com
-#           Action: sts:AssumeRole
-#     ManagedPolicyArns:
-#       - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role
 
 # ECS TaskDefine
   ECSTaskDefine:
